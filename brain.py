@@ -20,16 +20,17 @@ def get_scan(file):
     image = objs['image']
 
     image = Image.fromarray(normalize_to_uint8(image))
-    image_resized = image.resize((64, 64), resample=Image.Resampling.LANCZOS)  # or Image.BILINEAR
-    image_downsampled_array = np.array(image_resized).flatten()
+    image_resized = image.resize((512, 512), resample=Image.Resampling.LANCZOS)  # or Image.BILINEAR
+    image_array = np.array(image_resized)
+    # image_downsampled_array = np.array(image_resized).flatten()
 
     one_hot_idx = int(label) - 1
 
     data.close()
-    return (image_downsampled_array, one_hot_idx)
+    return (image_array, one_hot_idx)
 
 
-nn = NeuralNetwork([64 * 64, 16, 16, 3])
+nn = NeuralNetwork([256 * 256, 16, 16, 3], doConvolution=True)
 
 permutation = np.random.permutation(np.arange(1, 3065))
 train = permutation[:2500]
