@@ -3,6 +3,16 @@ import numpy as np
 
 class NeuralNetwork:
 
+    class Conv:
+        # Size is width/height, 
+        def __init__(self):
+            self.size = None
+
+            self.kernel = np.random.randn(3, 3) * 0.1
+            self.input = None
+            self.preactivation = None
+            self.activation = None
+
     class Layer:
         def __init__(self, size, last_size):
             self.size = size
@@ -20,15 +30,22 @@ class NeuralNetwork:
             self.grad_w = None
             self.grad_b = None
 
-    def __init__(self, layer_sizes, learning_rate=0.01, doConvolution = False):
+    def __init__(self, layer_sizes, learning_rate=0.01, doConvolution = False, convLayers = 1):
         if len(layer_sizes) < 2:
-            raise ValueError(f"At least 2 layers required. {len(layer_sizes)} provided.")
+            raise ValueError(f"At least 2 NN layers required. {len(layer_sizes)} provided.")
+        
+        self.convLayers = []
+        if doConvolution:
+            if convLayers < 1:
+                raise ValueError(f"At least 1 Convolution layers required. {convLayers} provided.")
+            else:
+                for _ in range(convLayers):
+                    self.convLayers.append(self.Conv())
 
         self.learning_rate = learning_rate
         self.num_incorrect = 0
         self.total = 0
         self.doConvolution = doConvolution
-        self.kernel = np.random.randn(3, 3) * 0.1
 
         self.layers = []
         last = None
@@ -45,9 +62,9 @@ class NeuralNetwork:
     def relu(z):
         return np.maximum(0, z)
     
-    def conv2d(self, image, padding=1, stride=1):
+    def conv2d(self, image, kernel, padding=1, stride=1):
         H, W = image.shape
-        kH, kW = self.kernel.shape
+        kH, kW = kernel.shape
 
         padded = np.pad(image, pad_width=padding, mode='constant', constant_values=0)
 
@@ -58,7 +75,7 @@ class NeuralNetwork:
         for i in range(out_H):
             for j in range(out_W):
                 region = padded[i*stride:i*stride + kH, j*stride:j*stride + kW]
-                output[i, j] = np.sum(region * self.kernel)
+                output[i, j] = np.sum(region * kernel)
         return output
     
     def conv2d_backward(self, d_out, input, kernel, padding=1, stride=1):
@@ -68,7 +85,7 @@ class NeuralNetwork:
         H_out, W_out = d_out.shape
 
         padded_input = np.pad(input, padding, mode='constant', constant_values=0)
-        d_input_padded = np.zeros_like(padded_input)
+        d_input_padded = np.zeros_like(padded_input, dtype=np.float32)
         d_kernel = np.zeros_like(kernel)
 
         for i in range(H_out):
@@ -97,12 +114,34 @@ class NeuralNetwork:
                 region = x[i*stride:i*stride+pool_size, j*stride:j*stride+pool_size]
                 pooled[i, j] = np.max(region)
         return pooled
+    
+    def max_pool2d_backward(self, d_out, input, pool_size=2, stride=2):
+        H_in, W_in = input.shape
+        H_out, W_out = d_out.shape
+        d_input = np.zeros_like(input)
+
+        for i in range(H_out):
+            for j in range(W_out):
+                h_start = i * stride
+                w_start = j * stride
+                region = input[h_start:h_start+pool_size, w_start:w_start+pool_size]
+
+                # Mask: 1 at max value, 0 elsewhere
+                mask = (region == np.max(region))
+                d_input[h_start:h_start+pool_size, w_start:w_start+pool_size] += d_out[i, j] * mask
+
+        return d_input
+
 
     def _forward_pass(self, input):
         if self.doConvolution:
-            input = self.conv2d(input, padding=1, stride=1)
-            input = self.relu(input)
-            input = self.max_pool2d(input, pool_size=2, stride=2)
+            for i in range(len(self.convLayers)):
+                self.convLayers[i].input = input
+                conv_output = self.conv2d(input, self.convLayers[i].kernel, padding=1, stride=1)
+                self.convLayers[i].preactivation = conv_output
+                relu_output = self.relu(conv_output)
+                self.convLayers[i].activation = relu_output
+                input = self.max_pool2d(relu_output, pool_size=2, stride=2)
 
         input = np.array(input).flatten()
         self.layers[0].activation = input
@@ -150,24 +189,35 @@ class NeuralNetwork:
                 grad_z = (layer.weights.T @ grad_z).reshape(prev_layer.activation.shape)
                 grad_z = grad_z * (prev_layer.activation > 0)
 
+
         for i in range(1, len(self.layers)):
             layer = self.layers[i]
             layer.weights -= self.learning_rate * layer.grad_w
             layer.biases -= self.learning_rate * layer.grad_b
 
         if self.doConvolution:
-            prev_layer = self.layers[0]
-            input = self.layers[0].activation.reshape(int(math.sqrt(self.layers[0].activation.size)), 
-                                                      int(math.sqrt(self.layers[0].activation.size)))
-            d_out = grad_z.reshape(int(math.sqrt(grad_z.size)), 
-                                   int(math.sqrt(grad_z.size)))
-            d_input, d_kernel = self.conv2d_backward(
-                d_out=d_out,
-                input=input,    
-                kernel=self.kernel,
-                padding=1,
-                stride=1
-            )
 
-            self.kernel -= self.learning_rate * d_kernel
+            grad_z = grad_z.reshape(int(math.sqrt(grad_z.size)), 
+                                    int(math.sqrt(grad_z.size)))
+            
+            for i in range(len(self.convLayers) - 1, -1, -1):
+                conv_layer = self.convLayers[i]
+
+                grad_z = self.max_pool2d_backward(
+                    d_out=grad_z, 
+                    input=conv_layer.activation, 
+                    pool_size=2, 
+                    stride=2)
+                
+                grad_z = grad_z * (conv_layer.preactivation > 0)
+                
+                grad_z, d_kernel = self.conv2d_backward(
+                    d_out=grad_z,
+                    input=conv_layer.input,    
+                    kernel=conv_layer.kernel,
+                    padding=1,
+                    stride=1
+                )
+
+                conv_layer.kernel -= self.learning_rate * d_kernel
 

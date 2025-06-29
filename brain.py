@@ -1,7 +1,14 @@
+import math
 import h5py
 import numpy as np
 from PIL import Image
 from neural_network import NeuralNetwork
+
+image_size = 512
+hidden_layer_size = 16
+conv_layers = 3
+classifications = 3
+np.random.seed(1)
 
 def normalize_to_uint8(image):
     image = image.astype(np.float64)  
@@ -20,7 +27,7 @@ def get_scan(file):
     image = objs['image']
 
     image = Image.fromarray(normalize_to_uint8(image))
-    image_resized = image.resize((512, 512), resample=Image.Resampling.LANCZOS)  # or Image.BILINEAR
+    image_resized = image.resize((image_size, image_size), resample=Image.Resampling.LANCZOS)  # or Image.BILINEAR
     image_array = np.array(image_resized)
     # image_downsampled_array = np.array(image_resized).flatten()
 
@@ -30,7 +37,13 @@ def get_scan(file):
     return (image_array, one_hot_idx)
 
 
-nn = NeuralNetwork([256 * 256, 16, 16, 3], doConvolution=True)
+result_size = image_size
+for _ in range(conv_layers):
+    result_size = math.sqrt(result_size)
+
+nn = NeuralNetwork([result_size * result_size, hidden_layer_size, hidden_layer_size, classifications], 
+                    doConvolution=True, 
+                    convLayers=conv_layers)
 
 permutation = np.random.permutation(np.arange(1, 3065))
 train = permutation[:2500]
