@@ -4,9 +4,10 @@ import numpy as np
 from PIL import Image
 from neural_network import NeuralNetwork
 
-image_size = 512
+image_size = 128
 hidden_layer_size = 16
-conv_layers = 3
+conv = True
+conv_layers = 1
 classifications = 3
 np.random.seed(1)
 
@@ -36,13 +37,12 @@ def get_scan(file):
     data.close()
     return (image_array, one_hot_idx)
 
-
 result_size = image_size
-for _ in range(conv_layers):
-    result_size = math.sqrt(result_size)
+if conv:
+    result_size = int((image_size) / (2 ** conv_layers))
 
 nn = NeuralNetwork([result_size * result_size, hidden_layer_size, hidden_layer_size, classifications], 
-                    doConvolution=True, 
+                    doConvolution=conv, 
                     convLayers=conv_layers)
 
 permutation = np.random.permutation(np.arange(1, 3065))

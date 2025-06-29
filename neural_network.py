@@ -9,6 +9,7 @@ class NeuralNetwork:
             self.size = None
 
             self.kernel = np.random.randn(3, 3) * 0.1
+            self.bias = 0
             self.input = None
             self.preactivation = None
             self.activation = None
@@ -62,9 +63,10 @@ class NeuralNetwork:
     def relu(z):
         return np.maximum(0, z)
     
-    def conv2d(self, image, kernel, padding=1, stride=1):
+    def conv2d(self, convLayer, padding=1, stride=1):
+        image = convLayer.input
         H, W = image.shape
-        kH, kW = kernel.shape
+        kH, kW = convLayer.kernel.shape
 
         padded = np.pad(image, pad_width=padding, mode='constant', constant_values=0)
 
@@ -75,7 +77,7 @@ class NeuralNetwork:
         for i in range(out_H):
             for j in range(out_W):
                 region = padded[i*stride:i*stride + kH, j*stride:j*stride + kW]
-                output[i, j] = np.sum(region * kernel)
+                output[i, j] = np.sum(region * convLayer.kernel) + convLayer.bias
         return output
     
     def conv2d_backward(self, d_out, input, kernel, padding=1, stride=1):
@@ -87,6 +89,7 @@ class NeuralNetwork:
         padded_input = np.pad(input, padding, mode='constant', constant_values=0)
         d_input_padded = np.zeros_like(padded_input, dtype=np.float32)
         d_kernel = np.zeros_like(kernel)
+        d_bias = 0
 
         for i in range(H_out):
             for j in range(W_out):
@@ -96,12 +99,14 @@ class NeuralNetwork:
 
                 d_input_padded[i*stride : i*stride+kH, j*stride : j*stride+kW] += d_out[i, j] * kernel
 
+        d_bias = np.sum(d_out)
+
         if padding > 0:
             d_input = d_input_padded[padding:-padding, padding:-padding]
         else:
             d_input = d_input_padded
 
-        return d_input, d_kernel
+        return d_input, d_kernel, d_bias
     
     def max_pool2d(self, x, pool_size=2, stride=2):
         H, W = x.shape
@@ -137,7 +142,7 @@ class NeuralNetwork:
         if self.doConvolution:
             for i in range(len(self.convLayers)):
                 self.convLayers[i].input = input
-                conv_output = self.conv2d(input, self.convLayers[i].kernel, padding=1, stride=1)
+                conv_output = self.conv2d(self.convLayers[i], padding=1, stride=1)
                 self.convLayers[i].preactivation = conv_output
                 relu_output = self.relu(conv_output)
                 self.convLayers[i].activation = relu_output
@@ -211,7 +216,7 @@ class NeuralNetwork:
                 
                 grad_z = grad_z * (conv_layer.preactivation > 0)
                 
-                grad_z, d_kernel = self.conv2d_backward(
+                grad_z, d_kernel, d_bias = self.conv2d_backward(
                     d_out=grad_z,
                     input=conv_layer.input,    
                     kernel=conv_layer.kernel,
@@ -220,4 +225,5 @@ class NeuralNetwork:
                 )
 
                 conv_layer.kernel -= self.learning_rate * d_kernel
+                conv_layer.bias -= self.learning_rate * d_bias
 
