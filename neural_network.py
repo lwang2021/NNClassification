@@ -172,6 +172,8 @@ class NeuralNetwork:
         accuracy = (1 - self.num_incorrect / self.total) * 100
         print(f"Expected: {label} | Actual: {guess} | Accuracy: {accuracy}% {emoji}")
 
+        return accuracy
+
     def train(self, pixels, label):
         self._forward_pass(pixels)
 

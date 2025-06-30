@@ -8,8 +8,8 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import classification_report, accuracy_score
 
 # === Configuration ===
-random.seed(42)
-DATASET_DIR = "dataset"
+random.seed(1)
+DATASET_DIR = "data/brain_scans"
 NUM_SAMPLES = 3064
 FILE_TEMPLATE = "{}.mat"  # Change to "{:04d}.mat" if filenames are zero-padded
 LABEL_OFFSET = 1  # MATLAB labels may be 1-indexed
@@ -53,12 +53,12 @@ y = np.array(y)
 
 # === Split Dataset ===
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42, stratify=y
+    X, y, test_size=0.2, random_state=1, stratify=y
 )
 
 # === Train Neural Network ===
 model = MLPClassifier(hidden_layer_sizes=(128, 64), activation='relu',
-                      solver='adam', max_iter=10, random_state=42, verbose=True)
+                      solver='adam', max_iter=10, random_state=1, verbose=True)
 model.fit(X_train, y_train)
 
 # === Evaluate ===
