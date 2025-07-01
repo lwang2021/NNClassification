@@ -1,13 +1,13 @@
-import math
+import time
 import h5py
 import numpy as np
 from PIL import Image
 from neural_network import NeuralNetwork
 
-image_size = 64
+image_size = 512
 hidden_layer_size = 16
-conv = False
-conv_layers = 1
+conv = True
+conv_layers = 3
 classifications = 3
 np.random.seed(1)
 
@@ -41,21 +41,43 @@ result_size = image_size
 if conv:
     result_size = int((image_size) / (2 ** conv_layers))
 
-# for epoch in range(1):
+# nn = NeuralNetwork([result_size * result_size, hidden_layer_size, hidden_layer_size, classifications], 
+#                     doConvolution=conv, 
+#                     convLayers=conv_layers)
+
+# indices = np.random.permutation(np.arange(1, 3065))
+# train = indices[:500]
+# test = indices[500:600]
+# train_idx = 0
+# test_idx = 0
+
+# start = time.time()
+
+# for epoch in range(10):
 #     print("Epoch:", epoch)
 #     for i in train:
 #         file = f"data/brain_scans/{i}.mat"
 #         nn.train(*get_scan(file))
+#         end = time.time()
+#         elapsed = end - start
+#         print(f"Trained index: {train_idx}, Elapsed time: {int(elapsed // 60)} min {int(elapsed % 60)} sec")
+#         train_idx += 1
 
 # for i in test:
 #     file = f"data/brain_scans/{i}.mat"
 #     nn.infer(*get_scan(file))
+#     end = time.time()
+#     elapsed = end - start
+#     print(f"Tested index: {test_idx}, Elapsed time: {int(elapsed // 60)} min {int(elapsed % 60)} sec")
+#     test_idx += 1
 
 indices = np.random.permutation(np.arange(1, 3065))
 N = 3065
 k = 5
 fold_size = N // k
 all_accuracies = []
+train_idx = 0
+test_idx = 0
 
 for fold in range(k):
     nn = NeuralNetwork([result_size * result_size, hidden_layer_size, hidden_layer_size, classifications], 
@@ -72,14 +94,26 @@ for fold in range(k):
     val_indices = indices[val_start:val_end]
     train_indices = np.concatenate((indices[:val_start], indices[val_end:]))
 
+    start = time.time()
+
     # Train your model
-    for i in train_indices:
-        file = f"data/brain_scans/{i}.mat"
-        nn.train(*get_scan(file))
+    for epoch in range(3):
+        print("Epoch:", epoch)
+        for i in train_indices:
+            file = f"data/brain_scans/{i}.mat"
+            nn.train(*get_scan(file))
+            end = time.time()
+            elapsed = end - start
+            print(f"Trained index: {train_idx}, Elapsed time: {int(elapsed // 60)} min {int(elapsed % 60)} sec")
+            train_idx += 1
 
     for i in val_indices:
         file = f"data/brain_scans/{i}.mat"
         accuracy = nn.infer(*get_scan(file))
+        end = time.time()
+        elapsed = end - start
+        print(f"Tested index: {test_idx}, Elapsed time: {int(elapsed // 60)} min {int(elapsed % 60)} sec")
+        test_idx += 1
     
     all_accuracies.append(accuracy)
 
